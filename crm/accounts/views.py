@@ -1,9 +1,11 @@
 from multiprocessing import context
 from django.http import HttpResponse
+from django.forms import inlineformset_factory
 from django.shortcuts import redirect, render
 from accounts.models import *
 from .models import *
 from .forms import *
+from .filters import *
 
 # Create your views here.
 def home(request):
@@ -22,17 +24,23 @@ def products(request):
 def customer(request,pk):
     customer = Customer.objects.get(id=pk)
     orders = customer.order_set.all()
-    context={'customer':customer,'orders':orders}
+    myfilter = OrderFilter(request.GET,queryset=orders)
+    orders = myfilter.qs
+    context={'customer':customer,'orders':orders,'myfilter':myfilter}
     return render(request, 'accounts/customer.html',context)
 
-def createOrders(request):
-    form = OrderForm()
-    context={'form':form}
+def createOrders(request,pk):
+    OrderFormSet = inlineformset_factory(Customer, Order, fields=('product','status'),extra=5)
+    customer = Customer.objects.get(id=pk)
+    formset = OrderFormSet(queryset=Order.objects.none(),instance=customer)
+    # form = OrderForm(initial={'customer':customer})
     if request.method == "POST":
-        form = OrderForm(request.POST)
-        if form.is_valid():
-            form.save()
+        formset = OrderFormSet(request.POST,instance=customer)
+        # form = OrderForm(request.POST)
+        if formset.is_valid():
+            formset.save()
             return redirect('/')
+    context={'formset':formset}
     return render(request,'accounts/order_form.html',context)
 
 def updateOrder(request,pk):
